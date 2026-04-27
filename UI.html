@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦋具身智能学习计划表🦋</title>
+    <style>
+        :root {
+            /* 亮色调配方案 (Apple Bright Style) */
+            --bg-color: #F9FAFB;
+            --card-bg: #FFFFFF;
+            --text-primary: #1F2937;
+            --text-secondary: #6B7280;
+            --accent: #EC4899; /* 亮粉色 (Apple Pink) */
+            --accent-dim: #FDF2F8; /* 极淡粉色 */
+            --border-color: #E5E7EB;
+            --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+            --done-color: #9CA3AF;
+            --completed-day-bg: #FBCFE8; /* 已完成格子的柔和粉色 */
+            --tooltip-bg: rgba(255, 255, 255, 0.98);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 50px;
+            box-sizing: border-box;
+            background-image:
+                radial-gradient(var(--accent-dim) 1.5px, transparent 1.5px),
+                radial-gradient(var(--accent-dim) 1.5px, transparent 1.5px);
+            background-size: 60px 60px;
+            background-position: 0 0, 30px 30px;
+            min-height: 100vh;
+        }
+
+        /* --- 核心修复：提升主体内容的层级，使其稳稳浮在粒子上方 --- */
+        h1, .subtitle, #calendar-container, #main-content-wrapper {
+            position: relative;
+            z-index: 10;
+        }
+
+        h1 {
+            color: var(--accent);
+            margin-bottom: 5px;
+            text-align: center;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: 400;
+            font-size: 15px;
+        }
+
+        /* --- 氛围感 Canvas 背景层 --- */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1; /* 确保悬浮在 body 背景点阵之上，内容层之下 */
+            pointer-events: none; /* 穿透点击，保护交互 */
+        }
+
+        /* --- 1. 宏观日历视角 --- */
+        #calendar-container {
+            width: 100%;
+            max-width: 1120px;
+            background-color: var(--card-bg);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            margin-bottom: 25px;
+            box-sizing: border-box;
+        }
+
+        #calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            padding: 0 5px;
+        }
+
+        #calendar-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        #reset-btn {
+            background-color: var(--accent-dim);
+            border: 1px solid #FBCFE8;
+            color: var(--accent);
+            padding: 6px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        #reset-btn:hover {
+            background-color: var(--accent);
+            color: white;
+            box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+        }
+
+        #calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+        }
+
+        .cal-item {
+            background-color: #F3F4F6;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .cal-item:hover {
+            transform: scale(1.05) translateY(-2px);
+            border-color: var(--accent);
+            background-color: white;
+            box-shadow: var(--shadow-md);
+            z-index: 10;
+        }
+
+        .cal-day-num {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text-secondary);
+        }
+
+        .cal-date-ref {
+            font-size: 11px;
+            color: #9CA3AF;
+            margin-top: 2px;
+            font-weight: 500;
+        }
+
+        /* 正在进行的天数 */
+        .cal-item.active {
+            border-color: var(--accent);
+            background-color: var(--accent-dim);
+            box-shadow: 0 0 0 2px var(--accent) inset;
+        }
+        .cal-item.active .cal-day-num {
+            color: var(--accent);
+        }
+
+        /* 已完成的天数 */
+        .cal-item.completed {
+            background-color: var(--completed-day-bg);
+            border-color: var(--completed-day-bg);
+            color: white;
+        }
+
+        .checkmark {
+            display: none;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .cal-item.completed .cal-day-num,
+        .cal-item.completed .cal-date-ref {
+            display: none;
+        }
+
+        .cal-item.completed .checkmark {
+            display: block;
+        }
+
+        /* --- Tooltip (日历悬浮框) 样式 --- */
+        #calendar-tooltip {
+            display: none;
+            position: fixed;
+            background-color: var(--tooltip-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 16px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            z-index: 2000;
+            width: 320px;
+            pointer-events: none;
+            box-sizing: border-box;
+            backdrop-filter: blur(8px);
+        }
+
+        .tt-header {
+            border-bottom: 2px solid var(--accent-dim);
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+            font-weight: 800;
+            color: var(--accent);
+            font-size: 15px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .tt-date {
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 12px;
+        }
+
+        .tt-topic {
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .tt-overview-title {
+            font-size: 12px;
+            color: var(--accent);
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .tt-overview-snip {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: block;
+            line-height: 1.4;
+        }
+
+        .tt-section {
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: var(--text-primary);
+            display: flex;
+            gap: 6px;
+        }
+
+        .tt-prefix {
+            font-weight: 700;
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        /* --- 主内容布局 --- */
+        #main-content-wrapper {
+            display: flex;
+            gap: 24px;
+            width: 100%;
+            max-width: 1120px;
+            align-items: flex-start;
+            box-sizing: border-box;
+        }
+
+        /* --- 2. 当天任务聚焦区域 (中央) --- */
+        #today-container {
+            flex: 1;
+            min-width: 300px;
+            box-sizing: border-box;
+        }
+
+        .day-card {
+            background-color: var(--card-bg);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: var(--shadow-md);
+            border: 2px solid var(--accent);
+            box-sizing: border-box;
+        }
+
+        .day-header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .day-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--accent);
+            letter-spacing: -0.5px;
+        }
+
+        .topic-badge {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+            font-weight: 500;
+        }
+
+        .task-section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: flex-start;
+            background-color: #F9FAFB;
+            padding: 16px;
+            border-radius: 16px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+
+        .task-item:hover {
+            background-color: var(--accent-dim);
+            border-color: #FBCFE8;
+            transform: translateY(-1px);
+        }
+
+        .task-content {
+            flex: 1;
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .task-checkbox {
+            margin-left: 16px;
+            margin-top: 2px;
+            cursor: pointer;
+            width: 22px;
+            height: 22px;
+            accent-color: var(--accent);
+            transition: transform 0.1s;
+        }
+
+        .task-checkbox:active {
+            transform: scale(0.85);
+        }
+
+        .task-item.done .task-content {
+            color: var(--done-color);
+            text-decoration: line-through;
+        }
+        .task-item.done {
+            background-color: #F3F4F6;
+            border-color: transparent;
+        }
+
+        /* --- 3. 专家导读板块 (右侧) --- */
+        #overview-container {
+            width: 380px;
+            min-width: 300px;
+            position: sticky;
+            top: 20px;
+            box-sizing: border-box;
+        }
+
+        .overview-card {
+            background-color: var(--card-bg);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            box-sizing: border-box;
+        }
+
+        .overview-header {
+            border-bottom: 2px solid var(--accent-dim);
+            padding-bottom: 14px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-primary);
+            font-weight: 800;
+            font-size: 18px;
+        }
+        .mentor-icon {
+            font-size: 24px;
+        }
+
+        #daily-overview-content {
+            font-size: 15px;
+            line-height: 1.7;
+            color: var(--text-primary);
+        }
+
+        /* 导读内部 HTML 样式增强 */
+        #daily-overview-content h4 {
+            color: var(--accent);
+            margin-top: 0px;
+            margin-bottom: 10px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+        #daily-overview-content p {
+            margin: 0 0 12px 0;
+            color: #4B5563;
+        }
+        #daily-overview-content b {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* --- 新增：心灵马杀鸡 (鸡汤) 样式 --- */
+        .comfort-quote {
+            margin-top: 24px;
+            padding: 14px 18px;
+            background: linear-gradient(135deg, #FDF2F8 0%, #FFF5F5 100%);
+            border-left: 4px solid var(--accent);
+            border-radius: 0 14px 14px 0;
+            font-size: 13px;
+            color: #6B7280;
+            font-style: italic;
+            line-height: 1.6;
+            box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.8);
+            position: relative;
+        }
+        .comfort-quote::before {
+            content: "💌";
+            position: absolute;
+            top: -12px;
+            left: -12px;
+            font-size: 18px;
+            font-style: normal;
+            background: white;
+            border-radius: 50%;
+            padding: 2px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* --- 全部完成后的欢庆提示 --- */
+        #all-complete-message {
+            display: none;
+            text-align: center;
+            padding: 60px 20px;
+            background-color: var(--card-bg);
+            border-radius: 24px;
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 30px rgba(236, 72, 153, 0.2);
+            color: var(--text-primary);
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 20px;
+        }
+        #all-complete-message h2 {
+            color: var(--accent);
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        /* ========================================= */
+        /* --- 爱心特效粒子样式 (Pink Heart Burst) --- */
+        /* ========================================= */
+        .heart-particle {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            animation: floatUp 1s ease-out forwards;
+            font-size: 20px;
+            text-shadow: 0 0 5px rgba(236, 72, 153, 0.5);
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translate(0, 0) scale(0.5);
+                opacity: 1;
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--tx), var(--ty)) scale(1.5) rotate(var(--rot));
+                opacity: 0;
+            }
+        }
+
+        /* --- 响应式布局调整 --- */
+        @media (max-width: 1000px) {
+            #main-content-wrapper {
+                flex-direction: column;
+                align-items: center;
+            }
+            #overview-container {
+                width: 100%;
+                position: static;
+                order: -1;
+                margin-bottom: 24px;
+            }
+            #today-container {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            #calendar-grid { gap: 6px; }
+            .cal-day-num { font-size: 16px; }
+            .checkmark { font-size: 18px; }
+
+            #calendar-tooltip {
+                width: calc(100% - 24px);
+                position: fixed;
+                bottom: 20px;
+                top: auto !important;
+                left: 12px !important;
+                pointer-events: auto;
+            }
+            h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>AI Learning 🎀</h1>
+    <p class="subtitle">具身智能速成课 | 30天成长手账</p>
+
+    <div id="calendar-container">
+        <div id="calendar-header">
+            <span id="calendar-title">🌸 进度概览</span>
+            <button id="reset-btn" onclick="resetProgress()">重新开始吧</button>
+        </div>
+        <div id="calendar-grid">
+            </div>
+    </div>
+
+    <div id="calendar-tooltip"></div>
+
+    <div id="main-content-wrapper">
+
+        <div id="today-container">
+            </div>
+
+        <div id="overview-container">
+            <div class="overview-card">
+                <div class="overview-header">
+                    <span class="mentor-icon">🧚‍♀️</span>
+                    阿俊寄语
+                </div>
+                <div id="daily-overview-content">
+                    </div>
+            </div>
+        </div>
+
+        <div id="all-complete-message">
+            <h2>✨ 恭喜通关！完美蜕变！ ✨</h2>
+            <p style="font-size: 18px; margin-top: 20px;">这300个小时的坚持，让你从感知到了解，从了解到掌握。</p>
+            <p style="font-size: 16px; color: #666;">你已经具备了独立探索具身智能世界的能力。带上你的作品，自信地去敲开新世界的大门吧！</p>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 0. 氛围感粒子背景特效 (显著可见版)
+        // ==========================================
+        function initBackgroundParticles() {
+            const canvas = document.createElement('canvas');
+            canvas.id = 'bg-canvas';
+            document.body.prepend(canvas);
+            const ctx = canvas.getContext('2d');
+
+            let width, height;
+            let particles = [];
+
+            const resizeCanvas = () => {
+                width = window.innerWidth;
+                height = window.innerHeight;
+                const dpr = window.devicePixelRatio || 1;
+
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                ctx.scale(dpr, dpr);
+
+                canvas.style.width = width + 'px';
+                canvas.style.height = height + 'px';
+            };
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            class Particle {
+                constructor() {
+                    this.x = Math.random() * width;
+                    this.y = Math.random() * height;
+                    this.r = Math.random() * 3 + 2;
+                    this.vx = (Math.random() - 0.5) * 0.6;
+                    this.vy = (Math.random() - 0.5) * 0.6 - 0.2;
+                    this.alpha = Math.random() * 0.5 + 0.3;
+                }
+
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    if (this.x < -this.r) this.x = width + this.r;
+                    if (this.x > width + this.r) this.x = -this.r;
+                    if (this.y < -this.r) this.y = height + this.r;
+                    if (this.y > height + this.r) this.y = -this.r;
+                }
+
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(236, 72, 153, ${this.alpha})`;
+                    ctx.fill();
+                }
+            }
+
+            const particleCount = 80;
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+
+            const animate = () => {
+                ctx.clearRect(0, 0, width, height);
+                particles.forEach(p => {
+                    p.update();
+                    p.draw();
+                });
+                requestAnimationFrame(animate);
+            };
+
+            animate();
+        }
+
+        // ==========================================
+        // 1. 核心计划数据 (新增comfort鸡汤字段)
+        // ==========================================
+        const planData = [
+            { day: 1, date: "4.27", week: 1, topic: "Linux与Git基础", morning: "学习Ubuntu基本命令、Git核心逻辑", afternoon: "安装双系统，配置终端，建GitHub仓", evening: "整理常用命令笔记", overview: "<h4>工程基建日</h4><p>告别IDE！要在黑框框（终端）里优雅地敲代码。<b>掌握 Linux 常用命令是你进实验室的第一道坎</b>。目标：当导师给你一个干净的电脑时，你能迅速搭建起感知算法需要的环境。</p>", comfort: "万事开头难，看着黑漆漆的终端觉得陌生很正常。今天只要把环境装好，你就已经超棒啦！记得喝杯甜甜的奶茶奖励自己哦。" },
+            { day: 2, date: "4.28", week: 1, topic: "面向对象的Python", morning: "学习Python类、继承、多态", afternoon: "写具有多重继承的机器人系统代码", evening: "了解Conda与虚拟环境", overview: "<h4>感知代码的结构</h4><p>机器人系统很复杂，不要写流水账代码。今日感知<b>面向对象（OOP）</b>之美。目标：能用 Class 封装一个机器人的感知模块和控制模块，让你的代码像艺术品一样整洁。</p>", comfort: "看不懂长篇代码没关系的，它就像一门外语，多看几遍就熟悉了。今天学累了就闭上眼睛休息一会儿，允许自己慢慢来。" },
+            { day: 3, date: "4.29", week: 1, topic: "线性代数NumPy", morning: "复习矩阵乘法、坐标系变换矩阵", afternoon: "熟练使用NumPy切片、广播运算", evening: "注册并浏览HuggingFace仓", overview: "<h4>理性的数学之美</h4><p>机器人眼中的世界是数字和矩阵。理解<b>旋转矩阵</b>是感知空间的基础。NumPy是感知数据的载体，今天必须熟练掌握矩阵的切片和广播，让数据在你指尖跳舞。</p>", comfort: "数学确实很枯燥，觉得头晕是再正常不过的反应啦。一点点推导，算不明白就先放着，明天换个心情再看也是一样的。" },
+            { day: 4, date: "4.30", week: 1, topic: "深度学习入门 (1)", morning: "《动手学深度学习》MLP章节", afternoon: "PyTorch手写MLP，不调高阶API", evening: "理解反向传播数学直觉", overview: "<h4>神经网络初体验</h4><p>今天我们开始赋予机器“神经”。你要感受最基础的MLP如何拟合复杂的曲线。下午纯手工用 PyTorch 写网络，感受<b>反向传播</b>中梯度的流动，这是深度学习的灵魂。</p>", comfort: "神经网络就像小婴儿一样，一开始也是什么都不懂。你也是在慢慢教它呀，对自己也要像对小生命一样有耐心哦。如果实在不会写代码记得Gemini哦" },
+            { day: 5, date: "5.01", week: 1, topic: "深度学习入门 (2)", morning: "学习卷积神经网络(CNN)、池化层", afternoon: "MNIST手写数字识别训练", evening: "整理Loss与Optimizer用法", overview: "<h4>赋予机器“视觉”</h4><p>机器如何“看”？今天学习<b>卷积神经网络（CNN）</b>。感受卷积核是如何提取图片的纹理和边缘的。跑通 MNIST，当你看到 Loss 下降时，你会真切感受到机器在“学习”。</p>", comfort: "看屏幕久了眼睛会酸吧？记得多眨眨眼。模型训练需要一点时间，你的成长也是，不要因为一时的卡壳而否定自己。" },
+            { day: 6, date: "5.02", week: 1, topic: "模型调试与炼丹", morning: "学习过拟合、正则化、学习率衰减", afternoon: "代码加入验证集，尝试调参", evening: "浏览PyTorch官方文档", overview: "<h4>优雅地“炼丹”</h4><p>会写网络只是开始，会调参才是魔法。感知 Loss 曲线的走势，判断是<b>过拟合</b>还是欠拟合。像一个耐心的园丁一样，用 Dropout 和学习率衰减修剪你的模型，让它变得更强壮。</p>", comfort: "Bug报错红了一大片是不是很吓人？别怕，那是程序在跟你说话，告诉你哪里生病了。深呼吸，一条条看，你肯定能治好它的。" },
+            { day: 7, date: "5.03", week: 1, topic: "Transformer降维打击", morning: "李宏毅Attention与Transformer课程", afternoon: "跑通HuggingFace预训练模型", evening: "阅读Attention机制核心代码", overview: "<h4>感知前沿的脉搏</h4><p><b>Transformer 和 Attention</b> 是这个时代的魔法棒！感受它是如何让模型将注意力集中在关键信息上的。今天试着玩一玩现成的预训练模型，感受大模型的魅力。</p>", comfort: "前沿的知识本来就像天书，觉得抽象绝不是你笨！能坚持坐在电脑前看下来就已经非常了不起了，抱抱你，今天辛苦啦。" },
+            { day: 8, date: "5.04", week: 2, topic: "强化学习(RL)起步", morning: "王树森RL课：马尔可夫、Reward", afternoon: "安装 gymnasium，熟悉交互接口", evening: "梳理RL核心概念导图", overview: "<h4>从感知到决策</h4><p>感知只是第一步，现在要让它学会“做决策”。感受<b>马尔可夫决策过程 (MDP)</b> 的哲学：在当前状态下，做最对的选择。今天搭好 Gymnasium 环境，准备看智能体在试错中成长。</p>", comfort: "新概念太多脑子要爆炸了对不对？没关系，记不住就先当故事听。今天能搞懂一两个词，就是巨大的进步了呀。" },
+            { day: 9, date: "5.05", week: 2, topic: "Q-Learning体系", morning: "学习DQN算法及其变体原理", afternoon: "在CartPole环境下手写简单的DQN", evening: "了解连续动作空间难题", overview: "<h4>跌跌撞撞的初学</h4><p>就像小婴儿学走路。用 DQN 算法让小木棍在车上保持平衡。感知<b>Q网络</b>是如何预测每一步的“价值”的。看着它从一开始就倒，到最后稳稳站住，这是一种孕育生命的喜悦。</p>", comfort: "看着小木棍一直倒下来是不是有点气馁？强化学习就是这样不断试错的过程。你也在试错中成长呀，不要对自己太苛刻。" },
+            { day: 10, date: "5.06", week: 2, topic: "策略梯度与PPO", morning: "学习 Actor-Critic 架构思想", afternoon: "调用 Stable-Baselines3 跑通PPO", evening: "泛读PPO原版论文摘要", overview: "<h4>优雅地连续运动</h4><p>机器人的关节是连续的，我们需要更优雅的算法。今天感知<b>PPO 算法</b>的魅力。理解 Actor（演员）和 Critic（评委）的默契配合。学会用成熟的库来训练它。</p>", comfort: "数学公式看不懂真的没关系，大牛们也会经常卡住。我们先理解它想做什么就好啦。今天也是特别努力的一天呢！" },
+            { day: 11, date: "5.07", week: 2, topic: "模仿学习(IL)基础", morning: "学习行为克隆(BC)数据处理逻辑", afternoon: "跑通简单的BC demo", evening: "思考BC的累计误差问题", overview: "<h4>言传身教的智慧</h4><p>有时候自己摸索太慢了，直接模仿人类吧！感知<b>行为克隆 (BC)</b>：输入你看到的（图像），输出你应该做的（动作）。重点在于如何把人类感知到的示范数据喂给模型。</p>", comfort: "模仿学习就像画画描摹，一开始会歪歪扭扭。别着急，熟练需要过程。累了就去摸摸小猫小狗，治愈一下自己柔软的心。" },
+            { day: 12, date: "5.08", week: 2, topic: "动作分块与策略", morning: "学习动作分块(Action Chunking)原理", afternoon: "阅读ALOHA项目动作生成代码", evening: "浏览 ACT 算法论文核心架构", overview: "<h4>连贯的舞步</h4><p>抓取杯子不是一个动作，而是一连串的舞步。感受<b>动作分块 (Action Chunking)</b> 的魔力，让模型一次性预测出接下来的一串动作。去欣赏斯坦福 ALOHA 项目中优美的代码逻辑吧。</p>", comfort: "别人的代码逻辑这么长，看懂一部分就很棒啦！今天如果觉得脑子转不动了，就早点睡觉，好的睡眠可是恢复能量的魔法。" },
+            { day: 13, date: "5.09", week: 2, topic: "Diffusion Policy (1)", morning: "深度理解扩散模型如何去噪", afternoon: "精读Diffusion Policy论文方法论", evening: "总结该策略对动作表达的优势", overview: "<h4>拥抱最前沿的浪漫</h4><p>扩散模型能画出美丽的画，也能指导机械臂优雅地移动。感知 <b>Diffusion Policy</b> 的浪漫：从纯粹的噪声中，一步步“雕刻”出最完美的动作轨迹。</p>", comfort: "Diffusion听起来就好高级好复杂，遇到不懂的地方直接跳过也没事！不要被纸老虎吓倒，你其实比自己想象的要坚强得多。" },
+            { day: 14, date: "5.10", week: 2, topic: "Diffusion Policy (2)", morning: "梳理完整的系统架构逻辑图", afternoon: "Git clone官方仓，配置环境", evening: "记录配环境遇到的Bug", overview: "<h4>驯服前沿的野兽</h4><p>今天有点折磨，你要把最前沿的代码跑起来。这需要极大的耐心去解决各种依赖冲突。不要急躁，<b>感知每一次 Debug 带来的成长</b>，配环境也是一种修行。</p>", comfort: "配环境简直是世界上最折磨人的事！各种红字报错，想砸电脑的心都有了吧？深呼吸，这绝不是你的错，是工具太难用了。去吃口甜品再战！" },
+            { day: 15, date: "5.11", week: 3, topic: "机器人运动学 FK", morning: "学习杆件变换、齐次变换矩阵", afternoon: "Python代码实现简易 FK 计算", evening: "建立空间系坐标变换感", overview: "<h4>感知机器的躯体</h4><p>今天我们将目光转向钢铁之躯。理解机械臂的骨骼（杆件）和关节。感知<b>正运动学 (FK)</b> 的魔法：只要知道每个关节弯曲的角度，就能准确算出指尖在空间中的位置。</p>", comfort: "空间想象力不够好？这太正常啦，不用逼自己在大脑里建3D模型。找几个杯子笔筒在桌子上比划比划，慢慢建立感觉就好。" },
+            { day: 16, date: "5.12", week: 3, topic: "机器人运动学 IK", morning: "学习雅可比矩阵、逆运动学迭代法", afternoon: "调用通用的解析法 IK 求解器库", evening: "了解四元数与欧拉角区别", overview: "<h4>精准的指尖触碰</h4><p>如果我想要指尖到达那个苹果，我的手臂该怎么弯？这就是<b>逆运动学 (IK)</b>。感受求解器在几毫秒内算出完美姿态的精密感。学会使用库，而不是手算。</p>", comfort: "运动学算不出来不要紧，现在的算法库都很聪明，会帮我们算的。你只需要知道怎么指挥它们。今天学得很棒，给你一朵小粉花 🌸" },
+            { day: 17, date: "5.13", week: 3, topic: "仿真器基建搭建", morning: "对比 Isaac Gym 与 MuJoCo", afternoon: "正确安装并配置物理仿真环境", evening: "跑通官方随机动作demo", overview: "<h4>构建数字孪生世界</h4><p>真实的机器人太贵容易坏，我们要在电脑里建一个数字世界！今天配置<b>物理仿真器</b>。当你在屏幕上看到机械臂受重力影响掉落时，你就成功创造了一个物理世界。</p>", comfort: "仿真器装好了吗？哪怕只是看它在屏幕里掉下去，也是很了不起的成就哦！今天不要再强迫自己学更多了，去看看窗外的日落吧。" },
+            { day: 18, date: "5.14", week: 3, topic: "仿真环境交互", morning: "看懂 URDF/MJCF 机器人模型描述", afternoon: "加载仿真臂，代码控制单个关节", evening: "修改物理属性观察响应变化", overview: "<h4>在赛博空间操控</h4><p>阅读机器人的“基因图谱”（URDF文件）。今天你要在仿真里写代码，让这堆虚拟的钢铁按照你的意志旋转。感受<b>用代码控制物理实体的快感</b>（即使是虚拟的）。</p>", comfort: "写代码控制虚拟的机器人，是不是感觉自己像个创造者？哪怕现在的操作还不太熟练，也请为自己鼓掌，你真的很了不起。" },
+            { day: 19, date: "5.15", week: 3, topic: "仿真感知与状态", morning: "仿真环境获取本体感受数据接口", afternoon: "代码实时读取关节角度/末端位置", evening: "整理RL/BC所需的输入向量", overview: "<h4>唤醒机器的感官</h4><p>机器人不仅要动，还要能“感知”自己。写代码去获取它的关节角度、速度、指尖受力。<b>将这些物理量感知为一串数组</b>，这是它认识自己的第一步。</p>", comfort: "一长串的数据看着头晕？我懂我懂。只要知道它们代表什么意思就好了，不需要死记硬背。别忘了给自己点个好吃的外卖犒劳一下。" },
+            { day: 20, date: "5.16", week: 3, topic: "脑机结合触碰任务", morning: "设计简单在仿真里的 \"触碰\" 任务", afternoon: "编写环境的奖励函数(Reward)", evening: "调整Reward权重监控 Loss", overview: "<h4>灵魂注入躯体</h4><p>感知与行动在此交汇！我们要把之前学的大脑（RL）和躯体（Sim）连起来。像训练小狗一样，为它设计<b>奖励函数 (Reward)</b>，引导它去触碰那个红色的球。</p>", comfort: "给机器人设计奖励，就像教小朋友一样。你是个温柔耐心的老师，慢慢引导它就好。对自己也要一样温柔，不准偷偷说自己笨哦。" },
+            { day: 21, date: "5.17", week: 3, topic: "RL模型训练验证", morning: "学习 Isaac Gym 的并行训练接口", afternoon: "训练触碰任务，观察其学会伸展", evening: "录制成功通关的任务视频", overview: "<h4>静待花开</h4><p>开始训练！看着仿真器里的它从笨拙地乱挥，到终于精准地碰到目标。这种<b>赋予死物以智能的成就感</b>，是你做具身智能最大的动力。记得录个视频留作纪念！</p>", comfort: "训练需要好久对不对？趁着这段时间，站起来活动活动肩膀，听一首喜欢的轻音乐。你已经做得非常好了，闭上眼静静等待结果吧。" },
+            { day: 22, date: "5.18", week: 4, topic: "3D视觉点云输入", morning: "RGB-D 相机原理、点云基础", afternoon: "调用 Open3D 可视化开源点云数据", evening: "了解 ResNet 提取视觉特征", overview: "<h4>睁开 3D 的眼睛</h4><p>光有本体感知不够，它需要看清这个立体的世界。感知<b>点云 (Point Cloud)</b> 这种奇妙的数据结构。用代码把无数个点还原成一个立体的杯子，感受 3D 视觉的魅力。</p>", comfort: "3D点云是不是很神奇？虽然写代码处理起来有点麻烦。今天学累了就果断合上电脑去追剧，让紧绷的大脑彻底放松一下吧。" },
+            { day: 23, date: "5.19", week: 4, topic: "感知与控制融合", morning: "图像+本体感受数据输入网络架构", afternoon: "搭极简但完整的视觉策略网络卡片", evening: "思考如何让网络学会特征融合", overview: "<h4>眼手协调的艺术</h4><p>眼睛看到了（CNN），身体感知到了（状态向量），怎么融合？今天搭建一个端到端的网络。感受多模态数据在神经网络中交汇、融合，最终化为精准动作的奇妙过程。</p>", comfort: "感觉知识串不起来，脑子有点乱？没关系，找张白纸随便画个草图理一理。每天进步一点点就足够啦，不用逼自己立刻融会贯通。" },
+            { day: 24, date: "5.20", week: 4, topic: "VLM/VLA前沿概念", morning: "Google RT-1/RT-2 核心思想原理", afternoon: "泛读论文了解 Transformer 将V/L转A", evening: "理解 VLM 赋能具身泛化能力", overview: "<h4>听懂人类语言</h4><p>现在，我们要让它“听懂”你的话。感知 <b>VLA 模型</b> 的强大：给它一张图，对它说“把红色块放进蓝碗里”，它就能懂。感受大语言模型是如何降维打击机器人控制的。</p>", comfort: "大模型听起来就很庞大，觉得有压迫感也是正常的。不要怕它，把它当成一个好用的玩具就好。今天你也很勇敢地面对了新知识呢。" },
+            { day: 25, date: "5.21", week: 4, topic: "开源VLA模型探索", morning: "对比 Octo 和 OpenVLA 的框架特点", afternoon: "克隆 Octo 推理代码，阅读网络构造", evening: "准备结业项目所需的仿真演示数据集", overview: "<h4>站在巨人的肩膀上</h4><p>不要重复造轮子。今天去拥抱开源的 VLA 模型。阅读世界顶尖大脑写出的代码。感知它们是如何优雅地处理图像、文字、动作这些不同维度的数据的。</p>", comfort: "看大佬的开源代码是不是觉得自己好弱小？千万别这么想！他们也是从第一行报错走过来的。你能去尝试阅读，就已经超越了绝大多数人。" },
+            { day: 26, date: "5.22", week: 4, topic: "项目开发(1)数据", morning: "确定项目任务(如仿真臂抓方块)", afternoon: "寻找、整理开源演示数据", evening: "编写高效的 HDF5 数据 Dataloader", overview: "<h4>结业战役：准备粮草</h4><p>开始你最后的试炼！找一个抓取任务。今天专注<b>处理数据</b>。数据集是AI的粮食，感知数据流向网络的过程，把图片和动作规整好，这是最枯燥但也最重要的一步。</p>", comfort: "处理数据是最无聊、最容易让人崩溃的步骤。觉得烦躁就停下来去吃点零食。这就像打扫房间，虽然辛苦但扫完会很清爽。抱抱你。" },
+            { day: 27, date: "5.23", week: 4, topic: "项目开发(2)训练", morning: "设计BC策略，决定网络骨架", afternoon: "编写网络训练循环，在显存限额跑代码", evening: "调试GPU显存占用 Bug", overview: "<h4>结业战役：铸造大脑</h4><p>把数据喂给你的网络！写好训练循环，感知 GPU 的轰鸣。盯着 Loss 曲线一点点下降，就像看着自己的孩子在一点点变聪明。遇到显存不够（OOM），冷静调整 batch size。</p>", comfort: "OOM（显存不足）报错是不是很搞心态？这不是你写错了，只是电脑资源不够啦。冷静下来改小点参数，你一定能顺畅跑起来的！" },
+            { day: 28, date: "5.24", week: 4, topic: "项目开发(3)测试", morning: "学习具身模型的标准测试 SuccessRate", afternoon: "权重模型载入环境，进行\"闭环\"测试", evening: "整理仿真中表现差、失败的案例", overview: "<h4>结业战役：实战检验</h4><p>把训练好的“大脑”放进仿真器的“身体”里！让它自己动起来。不要气馁于它的失败，<b>感知它每一次抓空的动作偏差</b>，这是明天优化的方向。</p>", comfort: "测试时机器人老是抓空，是不是很挫败？不要怀疑自己！真实世界本就充满不确定性。摸摸头，找出失败原因就是最宝贵的经验。" },
+            { day: 29, date: "5.25", week: 4, topic: "项目开发(4)报告", morning: "针对失败案例提出解决手段", afternoon: "加数据增强重训，或重设Reward重训", evening: "完善项目GitHub README展示文档", overview: "<h4>结业战役：完美谢幕</h4><p>根据昨天的失败进行微调，直到抓取成功率达到满意为止。然后，花时间写一份漂亮、详实的 <b>README</b>。这是你的门面，感知展示自己工作成果的喜悦。</p>", comfort: "终于快要结束啦！写文档虽然繁琐，但这都是你努力的闪光证明。回头看看自己走过的路，是不是觉得自己超级厉害？为你感到骄傲！" },
+            { day: 30, date: "5.26", week: 4, topic: "总结输出与下一步", morning: "回顾梳理30天技术栈，标记知识盲区", afternoon: "将所有项目、成果 GitHub 开源化整理", evening: "带着 README 项目去找导师谈科研计划", overview: "<h4>崭新的感知：成为研究者</h4><p>30天，300小时。你战胜了恐惧和迷茫。现在，感知一下自己这三十天的成长吧。深呼吸，带上你这三十天的勋章（GitHub），自信地去找导师，开启你的具身智能科研生涯！</p>", comfort: "最后一天啦！这30天你忍受了多少次崩溃和想掉眼泪的瞬间，但你都挺过来了！你拥有着了不起的韧性，去拥抱那个闪闪发光的自己吧！✨" }
+        ];
+
+        const TASK_STORAGE_KEY = 'pink_embodied_ai_v1';
+
+        const tooltip = document.getElementById('calendar-tooltip');
+        const overviewContent = document.getElementById('daily-overview-content');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initBackgroundParticles();
+            renderCalendarGrid();
+            refreshUI();
+        });
+
+        function renderCalendarGrid() {
+            const grid = document.getElementById('calendar-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            planData.forEach(data => {
+                const item = document.createElement('div');
+                item.className = 'cal-item';
+                item.id = `cal-day-${data.day}`;
+                item.innerHTML = `
+                    <div class="cal-day-num">${data.day}</div>
+                    <div class="cal-date-ref">${data.date}</div>
+                    <div class="checkmark">♥</div>
+                `;
+
+                item.addEventListener('mouseover', (e) => {
+                    let titleSummary = data.topic;
+                    let textSnip = "";
+
+                    try {
+                        if (data.overview && data.overview.includes('<h4>') && data.overview.includes('</h4>')) {
+                            const stripTags = (html) => {
+                                let tmp = document.createElement("DIV");
+                                tmp.innerHTML = html;
+                                return tmp.textContent || tmp.innerText || "";
+                            };
+                            titleSummary = stripTags(data.overview.split('<h4>')[1].split('</h4>')[0]);
+                            textSnip = stripTags(data.overview.split('</h4>')[1]).substring(0, 90) + "...";
+                        }
+                    } catch(err) {
+                        textSnip = data.morning.substring(0, 50) + "...";
+                    }
+
+                    tooltip.innerHTML = `
+                        <div class="tt-header">
+                            🌸 第 ${data.day} 天
+                            <span class="tt-date">${data.date}</span>
+                        </div>
+                        <div class="tt-topic">主：${data.topic}</div>
+                        <div class="tt-overview-title">🎯 ${titleSummary}</div>
+                        <span class="tt-overview-snip">${textSnip}</span>
+                        <div class="tt-section"><span class="tt-prefix">🌅</span> ${data.morning.substring(0, 25)}${data.morning.length>25?'...':''}</div>
+                        <div class="tt-section"><span class="tt-prefix">💻</span> ${data.afternoon.substring(0, 25)}${data.afternoon.length>25?'...':''}</div>
+                        <div class="tt-section"><span class="tt-prefix">🌙</span> ${data.evening.substring(0, 25)}${data.evening.length>25?'...':''}</div>
+                    `;
+                    tooltip.style.display = 'block';
+                    moveTooltip(e);
+                });
+
+                item.addEventListener('mousemove', (e) => { moveTooltip(e); });
+                item.addEventListener('mouseout', () => { tooltip.style.display = 'none'; });
+
+                grid.appendChild(item);
+            });
+        }
+
+        function moveTooltip(e) {
+            const offsetX = 15;
+            const offsetY = 15;
+            let postionX = e.clientX + offsetX;
+            let postionY = e.clientY + offsetY;
+
+            const tooltipWidth = 340;
+            const tooltipHeight = 250;
+            if (postionX + tooltipWidth > window.innerWidth) {
+                postionX = e.clientX - tooltipWidth - offsetX;
+            }
+            if (postionY + tooltipHeight > window.innerHeight) {
+                postionY = e.clientY - tooltipHeight - offsetY;
+            }
+            tooltip.style.left = postionX + 'px';
+            tooltip.style.top = postionY + 'px';
+        }
+
+        function getActiveDay() {
+            const savedData = localStorage.getItem(TASK_STORAGE_KEY);
+            if (!savedData) return 1;
+
+            const checkedTasks = JSON.parse(savedData);
+
+            for (let i = 0; i < planData.length; i++) {
+                const dayData = planData[i];
+                const mDone = checkedTasks.includes(`day${dayData.day}_m`);
+                const aDone = checkedTasks.includes(`day${dayData.day}_a`);
+                const eDone = checkedTasks.includes(`day${dayData.day}_e`);
+
+                if (!(mDone && aDone && eDone)) return dayData.day;
+            }
+            return 31;
+        }
+
+        function refreshUI() {
+            const activeDay = getActiveDay();
+
+            document.querySelectorAll('.cal-item').forEach(item => {
+                item.classList.remove('active', 'completed');
+            });
+
+            planData.forEach(data => {
+                const item = document.getElementById(`cal-day-${data.day}`);
+                if (!item) return;
+                if (data.day < activeDay) item.classList.add('completed');
+                else if (data.day === activeDay) item.classList.add('active');
+            });
+
+            renderTodayTasks(activeDay);
+            renderDailyOverview(activeDay);
+        }
+
+        function renderTodayTasks(day) {
+            const container = document.getElementById('today-container');
+            const messageArea = document.getElementById('all-complete-message');
+
+            if (!container) return;
+
+            if (day > 30) {
+                container.style.display = 'none';
+                messageArea.style.display = 'block';
+                return;
+            } else {
+                container.style.display = 'block';
+                messageArea.style.display = 'none';
+            }
+
+            const data = planData.find(d => d.day === day);
+            if (!data) return;
+
+            const savedData = localStorage.getItem(TASK_STORAGE_KEY);
+            const checkedTasks = savedData ? JSON.parse(savedData) : [];
+
+            const morningId = `day${data.day}_m`;
+            const afternoonId = `day${data.day}_a`;
+            const eveningId = `day${data.day}_e`;
+
+            container.innerHTML = `
+                <div class="day-card">
+                    <div class="day-header">
+                        <div class="day-title">🎀 第 ${data.day} 天</div>
+                        <div class="topic-badge">${data.topic}</div>
+                    </div>
+
+                    <div class="task-section">
+                        <div class="section-title">🌅 Morning</div>
+                        <div class="task-item ${checkedTasks.includes(morningId)?'done':''}" id="item_${morningId}">
+                            <div class="task-content">${data.morning}</div>
+                            <input type="checkbox" class="task-checkbox" id="${morningId}" onchange="handleCheckboxChange(this, event)" ${checkedTasks.includes(morningId)?'checked':''}>
+                        </div>
+                    </div>
+
+                    <div class="task-section">
+                        <div class="section-title">💻 Afternoon</div>
+                        <div class="task-item ${checkedTasks.includes(afternoonId)?'done':''}" id="item_${afternoonId}">
+                            <div class="task-content">${data.afternoon}</div>
+                            <input type="checkbox" class="task-checkbox" id="${afternoonId}" onchange="handleCheckboxChange(this, event)" ${checkedTasks.includes(afternoonId)?'checked':''}>
+                        </div>
+                    </div>
+
+                    <div class="task-section">
+                        <div class="section-title">🌙 Evening</div>
+                        <div class="task-item ${checkedTasks.includes(eveningId)?'done':''}" id="item_${eveningId}">
+                            <div class="task-content">${data.evening}</div>
+                            <input type="checkbox" class="task-checkbox" id="${eveningId}" onchange="handleCheckboxChange(this, event)" ${checkedTasks.includes(eveningId)?'checked':''}>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDailyOverview(day) {
+            if (!overviewContent) return;
+            if (day > 30) {
+                overviewContent.innerHTML = "<h4>太棒啦！</h4><p>恭喜通关！30天感知与修炼完成！你已经从零迈入感知具身智能的门槛。去找导师聊聊你的感知和想法吧！💖</p>";
+                return;
+            }
+            const data = planData.find(d => d.day === day);
+            if (data && data.overview) {
+                // 将鸡汤(comfort)附加在overview内容的底部
+                let contentHTML = data.overview;
+                if (data.comfort) {
+                    contentHTML += `<div class="comfort-quote">${data.comfort}</div>`;
+                }
+                overviewContent.innerHTML = contentHTML;
+            }
+        }
+
+        function handleCheckboxChange(checkbox, event) {
+            const taskId = checkbox.id;
+            const taskItem = document.getElementById(`item_${taskId}`);
+
+            if (checkbox.checked) {
+                createHeartBurst(event.clientX, event.clientY);
+                taskItem.classList.add('done');
+            } else {
+                taskItem.classList.remove('done');
+            }
+
+            saveTaskState();
+
+            const todayCard = taskItem.closest('.day-card');
+            const totalTasks = todayCard.querySelectorAll('.task-checkbox').length;
+            const doneTasks = todayCard.querySelectorAll('.task-checkbox:checked').length;
+
+            if (totalTasks === doneTasks) {
+                setTimeout(() => {
+                    refreshUI();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }, 800);
+            }
+        }
+
+        // ==========================================
+        // 3. 爱心爆炸特效逻辑
+        // ==========================================
+        function createHeartBurst(x, y) {
+            const heartsCount = 12;
+            const colors = ['#EC4899', '#F472B6', '#FBCFE8', '#BE185D', '#ff99cc'];
+
+            for (let i = 0; i < heartsCount; i++) {
+                createSingleHeart(x, y, colors[Math.floor(Math.random() * colors.length)]);
+            }
+        }
+
+        function createSingleHeart(x, y, color) {
+            const heart = document.createElement('div');
+            heart.classList.add('heart-particle');
+            heart.innerHTML = '♥';
+            heart.style.color = color;
+
+            heart.style.left = `${x - 10}px`;
+            heart.style.top = `${y - 10}px`;
+
+            const angle = Math.random() * Math.PI * 2;
+            const velocity = 30 + Math.random() * 60;
+            const tx = Math.cos(angle) * velocity;
+            const ty = Math.sin(angle) * velocity - 30;
+            const rot = Math.random() * 360 - 180;
+
+            heart.style.setProperty('--tx', `${tx}px`);
+            heart.style.setProperty('--ty', `${ty}px`);
+            heart.style.setProperty('--rot', `${rot}`);
+
+            const scale = 0.5 + Math.random() * 1;
+            heart.style.fontSize = `${18 * scale}px`;
+
+            document.body.appendChild(heart);
+
+            setTimeout(() => {
+                heart.remove();
+            }, 1200);
+        }
+
+        function saveTaskState() {
+            const currentCheckedIds = [];
+            document.querySelectorAll('.task-checkbox:checked').forEach(cb => {
+                currentCheckedIds.push(cb.id);
+            });
+
+            const oldSavedData = localStorage.getItem(TASK_STORAGE_KEY);
+            let finalIdsToSave = [];
+
+            if (oldSavedData) {
+                const oldIds = JSON.parse(oldSavedData);
+                const activeDay = getActiveDay();
+
+                finalIdsToSave = oldIds.filter(id => {
+                    const dayMatch = id.match(/day(\d+)_/);
+                    if (dayMatch) {
+                        return parseInt(dayMatch[1]) !== activeDay;
+                    }
+                    return true;
+                });
+            }
+
+            finalIdsToSave = [...finalIdsToSave, ...currentCheckedIds];
+            localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(finalIdsToSave));
+        }
+
+        function resetProgress() {
+            if(confirm("你真的要清除所有记忆，重新开始感知的旅程吗？")) {
+                localStorage.removeItem(TASK_STORAGE_KEY);
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
