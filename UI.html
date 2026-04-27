@@ -148,16 +148,9 @@
         }
 
         .cal-day-num {
-            font-size: 20px;
+            font-size: 22px; /* 移除了日期后，数字稍微放大一点点视觉更平衡 */
             font-weight: 800;
             color: var(--text-secondary);
-        }
-
-        .cal-date-ref {
-            font-size: 11px;
-            color: #9CA3AF;
-            margin-top: 2px;
-            font-weight: 500;
         }
 
         /* 正在进行的天数 */
@@ -184,8 +177,7 @@
             font-weight: bold;
         }
 
-        .cal-item.completed .cal-day-num,
-        .cal-item.completed .cal-date-ref {
+        .cal-item.completed .cal-day-num {
             display: none;
         }
 
@@ -218,12 +210,7 @@
             color: var(--accent);
             font-size: 15px;
             display: flex;
-            justify-content: space-between;
-        }
-        .tt-date {
-            color: var(--text-secondary);
-            font-weight: 500;
-            font-size: 12px;
+            justify-content: center; /* 移除日期后，标题居中更好看 */
         }
 
         .tt-topic {
@@ -652,7 +639,7 @@
         }
 
         // ==========================================
-        // 1. 核心计划数据 (新增comfort鸡汤字段)
+        // 1. 核心计划数据 (保留了数据结构，但UI不再显示date)
         // ==========================================
         const planData = [
             { day: 1, date: "4.27", week: 1, topic: "Linux与Git基础", morning: "学习Ubuntu基本命令、Git核心逻辑", afternoon: "安装双系统，配置终端，建GitHub仓", evening: "整理常用命令笔记", overview: "<h4>工程基建日</h4><p>告别IDE！要在黑框框（终端）里优雅地敲代码。<b>掌握 Linux 常用命令是你进实验室的第一道坎</b>。目标：当导师给你一个干净的电脑时，你能迅速搭建起感知算法需要的环境。</p>", comfort: "万事开头难，看着黑漆漆的终端觉得陌生很正常。今天只要把环境装好，你就已经超棒啦！记得喝杯甜甜的奶茶奖励自己哦。" },
@@ -707,9 +694,10 @@
                 const item = document.createElement('div');
                 item.className = 'cal-item';
                 item.id = `cal-day-${data.day}`;
+
+                // --- 移除具体的日期，只保留第几天 ---
                 item.innerHTML = `
                     <div class="cal-day-num">${data.day}</div>
-                    <div class="cal-date-ref">${data.date}</div>
                     <div class="checkmark">♥</div>
                 `;
 
@@ -731,10 +719,10 @@
                         textSnip = data.morning.substring(0, 50) + "...";
                     }
 
+                    // --- 悬浮框中也移除了具体日期的 span ---
                     tooltip.innerHTML = `
                         <div class="tt-header">
                             🌸 第 ${data.day} 天
-                            <span class="tt-date">${data.date}</span>
                         </div>
                         <div class="tt-topic">主：${data.topic}</div>
                         <div class="tt-overview-title">🎯 ${titleSummary}</div>
@@ -874,7 +862,6 @@
             }
             const data = planData.find(d => d.day === day);
             if (data && data.overview) {
-                // 将鸡汤(comfort)附加在overview内容的底部
                 let contentHTML = data.overview;
                 if (data.comfort) {
                     contentHTML += `<div class="comfort-quote">${data.comfort}</div>`;
