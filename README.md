@@ -10,6 +10,7 @@
 
 每天三个时间段（早/午/晚）安排具体任务，从工程基础到前沿实战，循序渐进地带你掌握具身智能的核心技术栈。
 
+***学习笔记参考*** [https://github.com/Feijiake/EmbodyAI-30day-Notebook](https://github.com/Feijiake/EmbodyAI-30day-Notebook)
 ---
 
 ## 🎯 学习路线总览
